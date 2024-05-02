@@ -2,6 +2,8 @@ import tqdm
 import torch
 import torch.nn.init as init
 from torch.nn import Parameter, Sequential
+from data_loading import mnist_data
+from noiser import Noiser
 
 class Dense(torch.nn.Module):
     """
@@ -105,30 +107,41 @@ def create_generator_and_discriminator(noise_size, image_size, num_hidden_layers
 
 
 def train(generator, discriminator, 
-          generator_noise_gen, discriminator_noise_gen, 
+          generator_noise_gen, discriminator_noise_gen, image_dataloader,
           num_iterations=10, discrim_sub_iterations=1):
-    # Generator training loop
-    for _ in tqdm(num_iterations):
-        # Discriminator training loop
-        for _ in range(discrim_sub_iterations):
-            ## Getting Inputs
-            # Get minibatch of noise inputs
-            # Use generator to get minibatched input for discriminator
-            # Get minibatch of real examples from training data
+    for _ in range(num_epochs):
+        # Generator training loop--go through full dataset
+        for X, y in image_dataloader:
+            # Discriminator training loop
+            for _ in range(discrim_sub_iterations):
+                ## Getting Inputs
+                # Sample noise
+                noise = discriminator_noise_gen.noise()
+                # Use generator to get minibatched input for discriminator
+                generated_images = generator(noise)
+                # Get minibatch of real examples from training data
 
-            ## Updating parameters
-            # Use combined inputs to calculate gradients and take a step
-            pass
-        # Sample minibatch of noise
-        # Pass noise through generator
-        #  -> pass result through discriminator
-        # calculate gradients and update generator (NOT discriminator)
+                ## Updating parameters
+                # Use combined inputs to calculate gradients and take a step
+                pass
+            # Sample minibatch of noise
+            # Pass noise through generator
+            #  -> pass result through discriminator
+            # calculate gradients and update generator (NOT discriminator)
 
 
 if __name__ == "__main__":
-    gen, dis = create_generator_and_discriminator(2, 3, 4, 5)
-    for param in gen.parameters():
-        print(param)
-    print("Dis:")
-    for param in dis.parameters():
-        print(param)
+    batch_size = 4
+    image_loader = torch.utils.data.DataLoader(mnist_data,
+                                          batch_size=batch_size,
+                                          shuffle=False)
+
+    generator, discriminator = create_generator_and_discriminator(2, 3, 4, 5)
+    train(generator, discriminator, Noiser(30, batch_size), Noiser(30, batch_size), image_loader)
+
+
+    # for param in gen.parameters():
+    #     print(param)
+    # print("Dis:")
+    # for param in dis.parameters():
+    #     print(param)
