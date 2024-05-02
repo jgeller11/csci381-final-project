@@ -1,10 +1,10 @@
 import torchvision
-from torchvision.transforms import ToTensor
+import torchvision.transforms as T
 import torch
 
 mnist_data = torchvision.datasets.MNIST('data/mnist', 
                                         download=True,
-                                        transform=ToTensor())
+                                        transform=T.Compose([T.ToTensor(),torch.flatten]))
 data_loader = torch.utils.data.DataLoader(mnist_data,
                                           batch_size=4,
                                           shuffle=False)
