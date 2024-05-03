@@ -119,6 +119,7 @@ class GAN():
         # Output of discriminator is prediction of whether or not it is real 
         # (note it still needs to be passed through sigmoid to be normalized)
         self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
+        self.discriminator.add_module("sigmoid", torch.nn.Sigmoid())
 
     def gen_noise(self, batch_size = 1):
         noise = torch.empty(batch_size, self.noise_size)
@@ -141,7 +142,7 @@ class GAN():
         
     
     def discriminator_loss(self, preds, labels):
-        return torch.sum(torch.log(torch.abs(labels-preds)))
+        return -torch.sum(torch.log(1-torch.abs(labels-preds)))
     
     def evaluate(self, dataloader):
         """
@@ -156,8 +157,9 @@ class GAN():
             images, labels = self.mix_with_generated_images(batch)
             
             # Calculate the discriminator's performance
-            preds = self.discriminator(images)
+            preds = self.discriminator(images).squeeze(dim=1)
             total_loss += self.discriminator_loss(preds, labels)
+            
             total_samples += len(images)
         return total_loss / total_samples
     
@@ -166,11 +168,14 @@ class GAN():
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
 
-        discriminator_optimizer = torch.optim.SGD(self.discriminator.parameters(), lr = 0.001, momentum = 0.9)
-        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.001, momentum = 0.9)
+        discriminator_optimizer = torch.optim.SGD(self.discriminator.parameters(), lr = 0.0005, momentum = 0.0)
+        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.0005, momentum = 0.0)
         
         for epoch in range(num_epochs):
             # Evaluate model if validation set is given
+            
+            self.discriminator.eval()
+            print(f"After {epoch} training epochs: training loss = {self.evaluate(train_dataloader)}")
             if val_dataloader is not None:
                 self.discriminator.eval()
                 print(f"After {epoch} training epochs: loss = {self.evaluate(val_dataloader)}")
@@ -188,12 +193,12 @@ class GAN():
                     images, labels = self.mix_with_generated_images(training_images)
 
                     # Get predictions from model, calculate loss, and update parameters
-                    preds = torch.sigmoid(self.discriminator(images))
-                    print(f"Preds: {preds}")
-                    print(f"Labels: {labels}")
-                    print(f"Params: {[param for param in self.discriminator.parameters()]}")
+                    preds = self.discriminator(images).squeeze(dim = 1)
+                    # print(f"Preds: {preds}")
+                    # print(f"Labels: {labels}")
+                    # print(f"Params: {[param for param in self.discriminator.parameters()]}")
                     loss = self.discriminator_loss(preds, labels)
-                    print(loss)
+                    # print(loss)
                     assert not math.isnan(loss)
                     loss.backward()
                     discriminator_optimizer.step()
@@ -219,7 +224,7 @@ if __name__ == "__main__":
     noise_size = 30
     image_size = 28
 
-    gan = GAN(noise_size, image_size)
+    gan = GAN(noise_size, image_size, discriminator_hidden_layers=2, discriminator_layer_size=10, generator_hidden_layers=3, generator_layer_size=40)
     gan.train(data_manager.train(batch_size=8), data_manager.val())
 
     # generator, discriminator = create_generator_and_discriminator(noise_size, image_size, 10, 5)
