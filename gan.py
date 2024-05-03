@@ -2,7 +2,6 @@ import tqdm
 import torch
 import torch.nn.init as init
 from torch.nn import Parameter, Sequential
-from noiser import Noiser
 import torchvision
 import torchvision.transforms as T
 from data_loading import DataManager
