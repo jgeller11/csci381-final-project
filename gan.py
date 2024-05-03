@@ -1,3 +1,4 @@
+import math
 import tqdm
 import torch
 import torch.nn.init as init
@@ -165,8 +166,8 @@ class GAN():
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
 
-        discriminator_optimizer = torch.optim.SGD(self.discriminator.parameters(), lr = 0.01, momentum = 0.9)
-        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.01, momentum = 0.9)
+        discriminator_optimizer = torch.optim.SGD(self.discriminator.parameters(), lr = 0.001, momentum = 0.9)
+        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.001, momentum = 0.9)
         
         for epoch in range(num_epochs):
             # Evaluate model if validation set is given
@@ -188,7 +189,12 @@ class GAN():
 
                     # Get predictions from model, calculate loss, and update parameters
                     preds = torch.sigmoid(self.discriminator(images))
+                    print(f"Preds: {preds}")
+                    print(f"Labels: {labels}")
+                    print(f"Params: {[param for param in self.discriminator.parameters()]}")
                     loss = self.discriminator_loss(preds, labels)
+                    print(loss)
+                    assert not math.isnan(loss)
                     loss.backward()
                     discriminator_optimizer.step()
 
