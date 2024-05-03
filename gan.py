@@ -49,6 +49,8 @@ class Dense(torch.nn.Module):
         product of the weight vector with each of the new feature vectors.
         
         """        
+        print(f"Theta Shape: {self.weight.shape}")
+        print(f"x Shape: {x.shape}")
         x2 = torch.cat([torch.ones(x.shape[0],1),x], dim=1)
         return torch.matmul(self.weight,x2.t()).t()
 
@@ -87,6 +89,9 @@ class Clamp(torch.nn.Module):
         return x.clamp(min=0, max=1) 
 
 def make_dense_network(input_size, output_size, num_hidden_layers=10, hidden_layer_size=100):
+    """
+        Creates a Sequential of Dense and ReLU layers with given sizes
+    """
     layers = Sequential()
 
     layers.add_module("dense1", Dense(input_size, hidden_layer_size))
@@ -100,12 +105,78 @@ def make_dense_network(input_size, output_size, num_hidden_layers=10, hidden_lay
 
     return layers
 
-def create_generator_and_discriminator(noise_size, image_size, num_hidden_layers = 10, hidden_layer_size = 100):
-    generator = make_dense_network(noise_size, image_size, num_hidden_layers, hidden_layer_size)
-    generator.add_module("clamp", Clamp())
+class GAN():
+    def __init__(self, noise_size, image_width, 
+                 generator_hidden_layers=10, generator_layer_size=100,
+                 discriminator_hidden_layers=10, discriminator_layer_size=100):
+        
+        self.noise_size = noise_size
+        # We assume square images
+        self.flattened_image_size = image_width * image_width
 
-    discriminator = make_dense_network(image_size, 1, num_hidden_layers, hidden_layer_size)
-    return generator, discriminator
+        # Clamp the output of the generator, so it's a valid image
+        self.generator = make_dense_network(noise_size, self.flattened_image_size, generator_hidden_layers, generator_layer_size)
+        self.generator.add_module("clamp", Clamp())
+
+        # Output of discriminator is prediction of whether or not it is real 
+        # (note it still needs to be passed through sigmoid to be normalized)
+        self.discriminator = make_dense_network(image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
+
+    def gen_noise(self, batch_size = 1):
+        noise = torch.empty(batch_size, self.noise_size)
+        torch.nn.init.uniform_(noise, a=0, b=1)
+        return noise
+    
+    def train(train_dataloader, val_dataloader = None, num_epochs=10, discrim_sub_iterations=1):
+        discriminator_optimizer = torch.optim.SGD(discriminator.parameters(), lr = 0.01, momentum = 0.9)
+        generator_optimizer = torch.optim.SGD(generator.parameters(), lr = 0.01, momentum = 0.9)
+
+        if val_dataloader is not None:
+            evaluator = Evaluator(discriminator, generator, discriminator_noiser)
+
+        # TODO: actually allow for discrim_sub_iterations != 1
+        if discrim_sub_iterations != 1:
+            raise Exception("discrim_sub_iterations > 1 not yet supported")
+        for epoch in range(num_epochs):
+            # Evaluate model if validation set is given
+            if val_data_loader is not None:
+                discriminator.eval()
+            
+                print(f"After {epoch} training epochs: loss: {evaluator.evaluate(val_data_loader)}")
+
+            # Generator training loop--go through full dataset
+            discriminator.train()
+            for X, _ in image_dataloader:
+                # Discriminator training loop
+
+                for _ in range(discrim_sub_iterations):
+
+                    discriminator_optimizer.zero_grad()
+
+                    ## Getting Inputs
+                    # Sample noise
+                    noise = discriminator_noiser.noise()
+                    # Use generator to get minibatched input for discriminator
+                    generated_images = generator(noise)
+                    # Combine with minibatch of real examples from training data
+                    all_images = torch.cat((generated_images, X), dim = 0)
+                    
+                    # Make y vector with 1 for training images, 0 for generated images
+                    y = torch.cat((torch.ones(X.shape[0]),torch.zeros(generated_images.shape[0])))
+
+                    # Get predictions from model, calculate loss
+                    preds = torch.sigmoid(discriminator(all_images))
+                    loss = discriminator_loss(preds, y)
+                    loss.backward()
+
+                    ## Updating parameters
+                    discriminator_optimizer.step()
+
+                # Sample minibatch of noise
+                # Pass noise through generator
+                #  -> pass result through discriminator
+                # calculate gradients and update generator (NOT discriminator)
+    
 
 def discriminator_loss(preds, y):
     return torch.sum(torch.log(torch.abs(y-preds)))
@@ -118,19 +189,21 @@ class Evaluator():
     def __init__(self, discriminator, generator, noiser):
         self.discriminator = discriminator
         self.generator = generator
-        self.nosier = noiser
+        self.noiser = noiser
 
     # Evaluates discriminator using images from data_loader
     def evaluate(self, data_loader):
         total_samples = 0
         total_loss = 0
-        for batch in data_loader:
+        for batch, _ in data_loader:
 
             # Generate images with generator
             noise_data = self.noiser.noise(len(batch))
             generated_images = self.generator(noise_data)
 
-            all_images = torch.cat((batch, generated_images))
+            print(f"Batch Shape: {batch.shape}")
+            print(f"Generated Images Shape: {generated_images.shape}")
+            all_images = torch.cat([batch, generated_images])
 
             y = torch.cat((torch.ones(len(batch)), torch.zeros(len(batch))))
 
@@ -144,76 +217,36 @@ class Evaluator():
 
         
 
-def train(generator, discriminator, 
-          generator_noiser, discriminator_noiser, image_dataloader, 
-          val_data_loader = None, 
-          num_epochs=10, discrim_sub_iterations=1):
-    discriminator_optimizer = torch.optim.SGD(discriminator.parameters(), lr = 0.01, momentum = 0.9)
-    generator_optimizer = torch.optim.SGD(generator.parameters(), lr = 0.01, momentum = 0.9)
 
-    if val_data_loader is not None:
-        evaluator = Evaluator(discriminator, generator, discriminator_noiser)
-
-    # TODO: actually allow for discrim_sub_iterations != 1
-    if discrim_sub_iterations != 1:
-        raise Exception("discrim_sub_iterations > 1 not yet supported")
-    for epoch in range(num_epochs):
-        # Evaluate model if validation set is given
-        if val_data_loader is not None:
-            discriminator.eval()
-        
-            print(f"After {epoch} training epochs: loss: {evaluator.evaluate(val_data_loader)}")
-
-        # Generator training loop--go through full dataset
-        discriminator.train()
-        for X, _ in image_dataloader:
-            # Discriminator training loop
-
-            for _ in range(discrim_sub_iterations):
-
-                discriminator_optimizer.zero_grad()
-
-                ## Getting Inputs
-                # Sample noise
-                noise = discriminator_noiser.noise()
-                # Use generator to get minibatched input for discriminator
-                generated_images = generator(noise)
-                # Combine with minibatch of real examples from training data
-                all_images = torch.cat((generated_images, X), dim = 0)
-                
-                # Make y vector with 1 for training images, 0 for generated images
-                y = torch.cat((torch.ones(X.shape[0]),torch.zeros(generated_images.shape[0])))
-
-                # Get predictions from model, calculate loss
-                preds = torch.sigmoid(discriminator(all_images))
-                loss = discriminator_loss(preds, y)
-                loss.backward()
-
-                ## Updating parameters
-                discriminator_optimizer.step()
-
-            # Sample minibatch of noise
-            # Pass noise through generator
-            #  -> pass result through discriminator
-            # calculate gradients and update generator (NOT discriminator)
 
 
 if __name__ == "__main__":
+    # test_net = make_dense_network(3, 5)
+    
+    # print(test_net(torch.randn((16, 3))))
 
     mnist_data = torchvision.datasets.MNIST('data/mnist', 
                                         download=True,
                                         transform=T.Compose([T.ToTensor(),torch.flatten]))
 
+    train_size = int(.7 * len(mnist_data))
+    val_size = int(.1 * len(mnist_data))
+    test_size = len(mnist_data) - train_size - val_size
     training_data, val_data, test_data = torch.utils.data.random_split(mnist_data, 
-                                            map(int,[len(mnist_data)*0.7, len(mnist_data)*0.1, -1]),
+                                            [train_size, val_size, test_size],
                                             generator=torch.Generator().manual_seed(1))
 
     data_manager = DataManager(training_data, val_data, test_data)
 
-    batch_size = 4
+    batch_size = 8
+    noise_size = 30
+    image_size = 28
 
-    generator, discriminator = create_generator_and_discriminator(2, 3, 4, 5)
-    train(generator, discriminator, Noiser(30, batch_size), Noiser(30, batch_size), data_manager.train(), val_data_loader=data_manager.val())
+    noiser = Noiser(30, batch_size)
+    print(noiser.noise().shape)
+
+    generator, discriminator = create_generator_and_discriminator(noise_size, image_size, 10, 5)
+    train(generator, discriminator, Noiser(30, batch_size), Noiser(30, batch_size), data_manager.train(16), val_data_loader=data_manager.val())
 
 
     # for param in gen.parameters():
