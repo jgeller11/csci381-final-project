@@ -11,7 +11,11 @@ class Noiser():
         self.batch_size = batch_size
         
     # returns: uniform random values 0 to 1 in specified shape
-    def noise(self):
-        samples = torch.empty(self.batch_size, self.L)
+    def noise(self, num_samples = None):
+        if num_samples is None:
+            num_samples = self.L
+        samples = torch.empty(self.batch_size, num_samples)
         torch.nn.init.uniform_(samples, a=0, b=1, generator=None)
         return samples
+    
+
