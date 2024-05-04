@@ -114,7 +114,7 @@ class GAN():
 
         # Clamp the output of the generator, so it's a valid image
         self.generator = make_dense_network(noise_size, self.flattened_image_size, generator_hidden_layers, generator_layer_size)
-        self.generator.add_module("clamp", Clamp())
+        # self.generator.add_module("clamp", Clamp()) # Theory crafting this might be problematic
 
         # Output of discriminator is prediction of whether or not it is real 
         # (note it still needs to be passed through sigmoid to be normalized)
@@ -222,7 +222,7 @@ class GAN():
                 # Get predictions from model, calculate loss, and update parameters
                 preds = self.discriminator(images).squeeze(dim = 1)
                 loss = self.generator_loss(preds, labels)
-                print(loss)
+                # print(loss)
                 assert not math.isnan(loss)
                 loss.backward()
                 generator_optimizer.step()
