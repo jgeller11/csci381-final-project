@@ -131,6 +131,7 @@ class GAN():
 
         # Clamp the output of the generator, so it's a valid image
         self.generator = make_dense_network(noise_size, self.flattened_image_size, generator_hidden_layers, generator_layer_size)
+        self.generator.add_module("sigmoid", torch.nn.Sigmoid())
         # self.generator.add_module("clamp", Clamp()) # Theory crafting this might be problematic
 
         # Output of discriminator is prediction of whether or not it is real 
@@ -187,8 +188,8 @@ class GAN():
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
 
-        discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.99))
-        generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.99))
+        discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
+        generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
         
         for epoch in range(num_epochs):
             # Evaluate model if validation set is given
