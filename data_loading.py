@@ -3,6 +3,7 @@ import torchvision.transforms as T
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
+from info import DEVICE
 
 
 
@@ -68,7 +69,7 @@ class DataManager:
                 # do something with the batch
                 
         """
-        return DataLoader(self.test_set, batch_size=4, 
+        return DataLoader(self.val_set, batch_size=4, 
                           sampler=SequentialSampler(self.val_set))
     
     def test(self):

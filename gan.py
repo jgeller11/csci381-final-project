@@ -2,11 +2,12 @@ import math
 import tqdm
 import torch
 import torch.nn.init as init
-from torch.nn import Parameter, Sequential
+from torch.nn import Parameter, Sequential, BatchNorm1d
 import torchvision
 import torchvision.transforms as T
 from data_loading import DataManager
 from img_plot import display_image
+from info import DEVICE
 
 class Dense(torch.nn.Module):
     """
@@ -50,7 +51,7 @@ class Dense(torch.nn.Module):
         product of the weight vector with each of the new feature vectors.
         
         """
-        x2 = torch.cat([torch.ones(x.shape[0],1),x], dim=1)
+        x2 = torch.cat([torch.ones((x.shape[0],1)), x], dim=1)
         return torch.matmul(self.weight,x2.t()).t()
 
 class ReLU(torch.nn.Module):
@@ -87,19 +88,34 @@ class Clamp(torch.nn.Module):
     def forward(self, x):
         return x.clamp(min=0, max=1) 
 
+class HiddenLayer(torch.nn.Module):
+    def __init__(self, layer_size):
+        super().__init__()
+        self.layers = Sequential(
+            BatchNorm1d(layer_size),
+            Dense(layer_size, layer_size),
+            ReLU())
+
+    def forward(self, x):
+        return x + self.layers(x)
+
+    
+
+
 def make_dense_network(input_size, output_size, num_hidden_layers=10, hidden_layer_size=100):
     """
         Creates a Sequential of Dense and ReLU layers with given sizes
     """
     layers = Sequential()
 
+    layers.add_module("batchnorm1", BatchNorm1d(input_size))
     layers.add_module("dense1", Dense(input_size, hidden_layer_size))
     layers.add_module("relu1", ReLU())
 
     for i in range(num_hidden_layers - 1):
-        layers.add_module(f"dense{i+2}", Dense(hidden_layer_size, hidden_layer_size))
-        layers.add_module(f"relu{i+2}", ReLU())
+        layers.add_module(f"hiddenlayer{i+2}", HiddenLayer(hidden_layer_size))
 
+    layers.add_module(f"batchnorm{i+2}", BatchNorm1d(hidden_layer_size))
     layers.add_module(f"dense{num_hidden_layers+1}", Dense(hidden_layer_size, output_size))
 
     return layers
@@ -142,11 +158,11 @@ class GAN():
             return combined_images, labels
         
     
-    def discriminator_loss(self, preds, labels):
-        return -torch.mean(torch.log(1-torch.abs(labels-preds)))
+    def discriminator_loss(self, preds, labels, epsilon = 1e-8):
+        return -torch.mean(torch.log(1-torch.abs(labels-preds) + epsilon))
     
-    def generator_loss(self, preds, labels): 
-        return -torch.mean(torch.log(torch.abs(labels-preds)))
+    def generator_loss(self, preds, labels, epsilon = 1e-8): 
+        return -torch.mean(torch.log(torch.abs(labels-preds) + epsilon))
         
 
     def evaluate(self, dataloader):
@@ -156,65 +172,66 @@ class GAN():
             this should maybe return a tuple with the generator's loss too
         """
         total_samples = 0
-        total_loss = 0
+        correct_on_real_images = 0
+        correct_on_generated_images = 0
         for batch, _ in dataloader:
-            # Generate images with generator and combine with real images
-            images, labels = self.mix_with_generated_images(batch)
+            real_preds = self.discriminator(batch).squeeze(dim=1)
+            correct_on_real_images += (real_preds > 0.5).sum()
+
+            generated_preds = self.discriminator(self.gen_images(len(batch))).squeeze(dim=1)
+            correct_on_generated_images += (generated_preds < 0.5).sum()
             
-            # Calculate the discriminator's performance
-            preds = self.discriminator(images).squeeze(dim=1)
-            total_loss += len(images) * self.discriminator_loss(preds, labels)
-            
-            total_samples += len(images)
-        return total_loss / total_samples
+            total_samples += len(batch)
+        return correct_on_real_images / total_samples, correct_on_generated_images / total_samples
     
     def train(self, train_dataloader, val_dataloader = None, num_epochs=10, discrim_sub_iterations=1):
         # TODO: actually allow for discrim_sub_iterations != 1
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
 
-        discriminator_optimizer = torch.optim.SGD(self.discriminator.parameters(), lr = 0.001, momentum = 0.9)
-        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.0005, momentum = 0.9)
+        discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.01)
+        generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.005)
         
         for epoch in range(num_epochs):
             # Evaluate model if validation set is given
-            
             self.discriminator.eval()
-            print(f"After {epoch} training epochs: training loss = {self.evaluate(train_dataloader)}")
-            if val_dataloader is not None:
-                self.discriminator.eval()
-                print(f"After {epoch} training epochs: loss = {self.evaluate(val_dataloader)}")
-            display_image(self.gen_noise().squeeze())
-            display_image(self.gen_images().squeeze().clone().detach())
-            
+            self.generator.eval()
+            real_img_training_acc, gen_img_training_acc = self.evaluate(train_dataloader)
+            print(f"After {epoch} training epochs:")
+            print(f"\tReal Image Accuracy:                   {real_img_training_acc}")
+            print(f"\tGenerated Image Accuracy:              {gen_img_training_acc}")
 
+            if val_dataloader is not None:
+                real_img_validation_acc, gen_img_validation_acc = self.evaluate(val_dataloader)
+                print()
+                print(f"\tReal Image Accuracy (Validation):      {real_img_validation_acc}")
+                print(f"\tGenerated Image Accuracy (Validation): {gen_img_validation_acc}")
+
+            display_image(self.gen_images().squeeze().clone().detach())
             
             # Generator training loop--go through full dataset
             self.discriminator.train()
             for training_images, _ in train_dataloader:
                 # Discriminator training loop
                 self.discriminator.train()
-                if epoch < 2:
-                    for _ in range(discrim_sub_iterations):
-                        discriminator_optimizer.zero_grad()
+                for _ in range(discrim_sub_iterations):
+                    discriminator_optimizer.zero_grad()
 
-                        # Use generator to get minibatched input for discriminator
-                        images, labels = self.mix_with_generated_images(training_images)
+                    # Use generator to get minibatched input for discriminator
+                    images, labels = self.mix_with_generated_images(training_images)
 
-                        # Get predictions from model, calculate loss, and update parameters
-                        preds = self.discriminator(images).squeeze(dim = 1)
-                        # print(f"Preds: {preds}")
-                        # print(f"Labels: {labels}")
-                        # print(f"Params: {[param for param in self.discriminator.parameters()]}")
-                        loss = self.discriminator_loss(preds, labels)
-                        # print(loss)
-                        assert not math.isnan(loss)
-                        loss.backward()
-                        discriminator_optimizer.step()
+                    # Get predictions from model, calculate loss, and update parameters
+                    preds = self.discriminator(images).squeeze(dim = 1)
+                    loss = self.discriminator_loss(preds, labels)
+
+                    # if loss > 0:
+                    assert not math.isnan(loss)
+                    loss.backward()
+                    discriminator_optimizer.step()
                 # Generator training subroutine
                 self.discriminator.eval()
                 self.generator.train()
-                
+
                 generator_optimizer.zero_grad()
                 discriminator_optimizer.zero_grad()
                 # Use generator to get minibatched input for discriminator
@@ -226,16 +243,11 @@ class GAN():
                 # Get predictions from model, calculate loss, and update parameters
                 preds = self.discriminator(images).squeeze(dim = 1)
                 loss = self.generator_loss(preds, labels)
-                print(loss)
+                #print(loss.item(), end="\r")
                 assert not math.isnan(loss)
                 loss.backward()
                 generator_optimizer.step()
-
-
-                # Sample minibatch of noise
-                # Pass noise through generator
-                #  -> pass result through discriminator
-                # calculate gradients and update generator (NOT discriminator)
+            print()
 
 if __name__ == "__main__":
     mnist_data = torchvision.datasets.MNIST('data/mnist', 
@@ -253,19 +265,9 @@ if __name__ == "__main__":
     noise_size = 784
     image_size = 28
 
-    gan = GAN(noise_size, image_size, discriminator_hidden_layers=2, discriminator_layer_size=10, generator_hidden_layers=2, generator_layer_size=10)
+    gan = GAN(noise_size, image_size, discriminator_hidden_layers=6, discriminator_layer_size=100, generator_hidden_layers=6, generator_layer_size=100)
     gan.train(data_manager.train(batch_size=32), data_manager.val())
     print(f"Discriminator params:")
     print([param for param in gan.discriminator.parameters()])
     print(f"Generator params:")
     print([param for param in gan.generator.parameters()])
-
-    # generator, discriminator = create_generator_and_discriminator(noise_size, image_size, 10, 5)
-    # train(generator, discriminator, Noiser(30, batch_size), Noiser(30, batch_size), data_manager.train(16), val_data_loader=data_manager.val())
-
-
-    # for param in gen.parameters():
-    #     print(param)
-    # print("Dis:")
-    # for param in dis.parameters():
-    #     print(param)
