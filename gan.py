@@ -186,6 +186,8 @@ class GAN():
         # TODO: actually allow for discrim_sub_iterations != 1
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
+        
+
 
         discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.99))
         generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.99))
@@ -205,7 +207,11 @@ class GAN():
                 print(f"\tReal Image Accuracy (Validation):      {real_img_validation_acc}")
                 print(f"\tGenerated Image Accuracy (Validation): {gen_img_validation_acc}")
 
-            display_image(self.gen_images().squeeze().clone().detach())
+            # display_image(self.gen_images().squeeze().clone().detach())
+            display_image(self.gen_images().squeeze().clone().detach(), display=False, filename = f"testimgs/{epoch}_1.png")
+            display_image(self.gen_images().squeeze().clone().detach(), display=False, filename = f"testimgs/{epoch}_2.png")
+            display_image(self.gen_images().squeeze().clone().detach(), display=False, filename = f"testimgs/{epoch}_3.png")
+            
             
             # Generator training loop--go through full dataset
             self.discriminator.train()
@@ -264,7 +270,7 @@ if __name__ == "__main__":
     image_size = 28
 
     gan = GAN(noise_size, image_size, discriminator_hidden_layers=6, discriminator_layer_size=100, generator_hidden_layers=6, generator_layer_size=100)
-    gan.train(data_manager.train(batch_size=32), data_manager.val())
+    gan.train(data_manager.train(batch_size=32), num_epochs=1000)
     print(f"Discriminator params:")
     print([param for param in gan.discriminator.parameters()])
     print(f"Generator params:")
