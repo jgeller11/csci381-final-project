@@ -144,6 +144,10 @@ class GAN():
     def discriminator_loss(self, preds, labels):
         return -torch.sum(torch.log(1-torch.abs(labels-preds)))
     
+    def generator_loss(self, preds, labels):
+        return -torch.sum(torch.log(torch.abs(labels-preds)))
+        
+
     def evaluate(self, dataloader):
         """
             Calculates the model's performance on the given data.
@@ -179,7 +183,9 @@ class GAN():
             if val_dataloader is not None:
                 self.discriminator.eval()
                 print(f"After {epoch} training epochs: loss = {self.evaluate(val_dataloader)}")
+            
 
+            
             # Generator training loop--go through full dataset
             self.discriminator.train()
             for training_images, _ in train_dataloader:
@@ -202,6 +208,21 @@ class GAN():
                     assert not math.isnan(loss)
                     loss.backward()
                     discriminator_optimizer.step()
+                # Generator training subroutine
+                self.discriminator.eval()
+                
+                generator_optimizer.zero_grad()
+                discriminator_optimizer.zero_grad()
+                # Use generator to get minibatched input for discriminator
+                images, labels = self.mix_with_generated_images(training_images)
+
+                # Get predictions from model, calculate loss, and update parameters
+                preds = self.discriminator(images).squeeze(dim = 1)
+                loss = self.generator_loss(preds, labels)
+                assert not math.isnan(loss)
+                loss.backward()
+                generator_optimizer.step()
+
 
                 # Sample minibatch of noise
                 # Pass noise through generator
@@ -224,7 +245,7 @@ if __name__ == "__main__":
     noise_size = 30
     image_size = 28
 
-    gan = GAN(noise_size, image_size, discriminator_hidden_layers=2, discriminator_layer_size=10, generator_hidden_layers=3, generator_layer_size=40)
+    gan = GAN(noise_size, image_size, discriminator_hidden_layers=2, discriminator_layer_size=10, generator_hidden_layers=4, generator_layer_size=60)
     gan.train(data_manager.train(batch_size=8), data_manager.val())
 
     # generator, discriminator = create_generator_and_discriminator(noise_size, image_size, 10, 5)
