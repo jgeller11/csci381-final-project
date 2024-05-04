@@ -139,9 +139,7 @@ class GAN():
         self.discriminator.add_module("sigmoid", torch.nn.Sigmoid())
 
     def gen_noise(self, batch_size = 1):
-        noise = torch.empty(batch_size, self.noise_size)
-        torch.nn.init.uniform_(noise, a=0, b=1)
-        return noise
+        return torch.randn(batch_size, self.noise_size)
     
     def gen_images(self, batch_size=1):
         """
@@ -189,8 +187,8 @@ class GAN():
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
 
-        discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.01)
-        generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.005)
+        discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.99))
+        generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.99))
         
         for epoch in range(num_epochs):
             # Evaluate model if validation set is given
@@ -262,7 +260,7 @@ if __name__ == "__main__":
                                             generator=torch.Generator().manual_seed(1))
     data_manager = DataManager(training_data, val_data, test_data)
 
-    noise_size = 784
+    noise_size = 100
     image_size = 28
 
     gan = GAN(noise_size, image_size, discriminator_hidden_layers=6, discriminator_layer_size=100, generator_hidden_layers=6, generator_layer_size=100)
