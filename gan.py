@@ -144,7 +144,7 @@ class GAN():
     def discriminator_loss(self, preds, labels):
         return -torch.sum(torch.log(1-torch.abs(labels-preds)))
     
-    def generator_loss(self, preds, labels):
+    def generator_loss(self, preds, labels): 
         return -torch.sum(torch.log(torch.abs(labels-preds)))
         
 
@@ -173,7 +173,7 @@ class GAN():
             raise Exception("discrim_sub_iterations > 1 not yet supported")
 
         discriminator_optimizer = torch.optim.SGD(self.discriminator.parameters(), lr = 0.0005, momentum = 0.0)
-        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.0005, momentum = 0.0)
+        generator_optimizer = torch.optim.SGD(self.generator.parameters(), lr = 0.001, momentum = 0.0)
         
         for epoch in range(num_epochs):
             # Evaluate model if validation set is given
@@ -189,9 +189,8 @@ class GAN():
             # Generator training loop--go through full dataset
             self.discriminator.train()
             for training_images, _ in train_dataloader:
-                batch_size = len(training_images)
-
                 # Discriminator training loop
+                self.discriminator.train()
                 for _ in range(discrim_sub_iterations):
                     discriminator_optimizer.zero_grad()
 
@@ -210,15 +209,20 @@ class GAN():
                     discriminator_optimizer.step()
                 # Generator training subroutine
                 self.discriminator.eval()
+                self.generator.train()
                 
                 generator_optimizer.zero_grad()
                 discriminator_optimizer.zero_grad()
                 # Use generator to get minibatched input for discriminator
-                images, labels = self.mix_with_generated_images(training_images)
+                images = self.gen_images(len(training_images)).squeeze(dim = 1)
+                labels = torch.zeros(len(training_images))
+                # For now, I switched this to more closely match the paper
+                #images, labels = self.mix_with_generated_images(training_images)
 
                 # Get predictions from model, calculate loss, and update parameters
                 preds = self.discriminator(images).squeeze(dim = 1)
                 loss = self.generator_loss(preds, labels)
+                print(loss)
                 assert not math.isnan(loss)
                 loss.backward()
                 generator_optimizer.step()
@@ -247,6 +251,10 @@ if __name__ == "__main__":
 
     gan = GAN(noise_size, image_size, discriminator_hidden_layers=2, discriminator_layer_size=10, generator_hidden_layers=4, generator_layer_size=60)
     gan.train(data_manager.train(batch_size=8), data_manager.val())
+    print(f"Discriminator params:")
+    print([param for param in gan.discriminator.parameters()])
+    print(f"Generator params:")
+    print([param for param in gan.generator.parameters()])
 
     # generator, discriminator = create_generator_and_discriminator(noise_size, image_size, 10, 5)
     # train(generator, discriminator, Noiser(30, batch_size), Noiser(30, batch_size), data_manager.train(16), val_data_loader=data_manager.val())
