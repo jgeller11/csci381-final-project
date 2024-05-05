@@ -49,20 +49,22 @@ class GAN():
         H3 = 3 * self.flattened_image_size // 4
         # Clamp the output of the generator, so it's a valid image
         self.generator = Sequential(
-            BatchNorm1d(noise_size),
-            Linear(noise_size, H1),
+            NormalizedLinearWithResidual(49),
+            BatchNorm1d(49),
+            Linear(49, 98),
             ReLU(),
-            NormalizedLinearWithResidual(H1),
-            BatchNorm1d(H1),
-            Linear(H1, H2),
+            NormalizedLinearWithResidual(98),
+            BatchNorm1d(98),
+            Linear(98, 196),
             ReLU(),
-            NormalizedLinearWithResidual(H2),
-            BatchNorm1d(H2),
-            Linear(H2, H3),
+            NormalizedLinearWithResidual(196),
+            BatchNorm1d(196),
+            Linear(196, 392),
             ReLU(),
-            NormalizedLinearWithResidual(H3),
-            BatchNorm1d(H3),
-            Linear(H3, self.flattened_image_size),
+            NormalizedLinearWithResidual(392),
+            BatchNorm1d(392),
+            Linear(392, 784),
+            NormalizedLinearWithResidual(784),
             Sigmoid()
         )
         self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
@@ -70,7 +72,18 @@ class GAN():
 
         # Output of discriminator is prediction of whether or not it is real 
         # (note it still needs to be passed through sigmoid to be normalized)
-        self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
+        self.discriminator = Sequential(
+            BatchNorm1d(self.flattened_image_size),
+            Linear(self.flattened_image_size, H2),
+            ReLU(),
+            NormalizedLinearWithResidual(H2),
+            BatchNorm1d(H2),
+            Linear(H2, H1),
+            ReLU(),
+            NormalizedLinearWithResidual(H1),
+            BatchNorm1d(H1),
+            Linear(H1, 1)
+        )
         self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
         self.discriminator.to(device=DEVICE)
 
@@ -227,6 +240,6 @@ class GAN():
 
 if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
-    mnist_gan = GAN(noise_size=100, image_width=28, 
+    mnist_gan = GAN(noise_size=49, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
     mnist_gan.train(mnist_data_manager.train(batch_size=32), num_epochs=1000)
