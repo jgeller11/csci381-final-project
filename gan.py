@@ -74,9 +74,16 @@ class GAN():
         self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
         self.discriminator.to(device=DEVICE)
 
-        epsilon = 1e-8
-        self.discriminator_lossfn = (lambda logit, label : -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logit) - label))))
-        self.generator_lossfn = (lambda logit : -torch.mean(torch.log(epsilon + torch.sigmoid(logit))))
+    def discriminator_lossfn(self, logits, labels, real_image=False, epsilon=1e-5):
+        return -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logits) - labels)))
+    
+        if real_image:
+            return -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logits) - 1)))
+        else:
+            return -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logits))))
+        
+    def generator_lossfn(self, logits, epsilon=1e-5):
+        return -torch.mean(torch.log(epsilon + torch.sigmoid(logits)))
 
     def gen_noise(self, batch_size = 1):
         return torch.randn(batch_size, self.noise_size, device=DEVICE)
@@ -128,18 +135,46 @@ class GAN():
             print(f"Generated Image Accuracy: {generated_correct_acc}")
         return real_correct_acc, generated_correct_acc
     
-    def discriminator_train_step(self, training_images):
+    def discriminator_train_step(self, real_images):
         self.discriminator_optimizer.zero_grad()
-        # Use generator to get minibatched input for discriminator
-        images, labels = self.mix_with_generated_images(training_images)
 
-        # Get predictions from model, calculate loss, and update parameters
+        generated_images = self.gen_images(len(real_images)) # Get images from the generator
+        images = torch.cat([real_images, generated_images])
+
+        # Labels for the samples
+        labels = torch.cat((torch.ones(len(real_images), device=DEVICE), 
+                            torch.zeros(len(generated_images), device=DEVICE)))
+        
+        # Compute predictions and update the parameters
         preds = self.discriminator(images).squeeze(dim = 1)
         loss = self.discriminator_lossfn(preds, labels)
-        assert not math.isnan(loss)
         loss.backward()
         self.discriminator_optimizer.step()
-        # print(f"Discriminator Loss: {loss.item()}")
+
+        # Debugging assert
+        assert not math.isnan(loss)
+        
+
+        # # Get predictions from model, calculate loss, and update parameters
+        # self.discriminator_optimizer.zero_grad()
+        # generated_images = self.gen_images(len(real_images))
+        # generated_preds = self.discriminator(generated_images).squeeze(dim = 1)
+        # generated_labels = torch.zeros(len(generated_preds), device=DEVICE)
+        # generated_loss = self.discriminator_lossfn(generated_preds, generated_labels)
+        # print(f"Generated Loss: {generated_loss}")
+        # generated_loss.backward()
+        # # self.discriminator_optimizer.step()
+        # assert not math.isnan(generated_loss)
+        # # print(f"Discriminator Loss: {loss.item()}")
+
+        # # self.discriminator_optimizer.zero_grad()
+        # real_preds = self.discriminator(real_images).squeeze(dim = 1)
+        # real_labels = torch.ones(len(real_images), device=DEVICE)
+        # real_loss = self.discriminator_lossfn(real_preds, real_labels)
+        # print(f"Real Loss: {real_loss}")
+        # real_loss.backward()
+        # self.discriminator_optimizer.step()
+        # assert not math.isnan(real_loss)
     
     def generator_train_step(self, batch_size):
         self.generator_optimizer.zero_grad()
@@ -178,10 +213,10 @@ class GAN():
             
             
             # Generator training loop--go through full dataset
-            self.discriminator.train()
             for training_images in train_dataloader:
                 # Discriminator training loop
                 self.discriminator.train()
+                self.generator.eval()
                 for _ in range(discrim_sub_iterations):
                     self.discriminator_train_step(training_images)
 
