@@ -5,7 +5,7 @@ import torch.nn.init as init
 from torch.nn import Parameter, Sequential, BatchNorm1d
 import torchvision
 import torchvision.transforms as T
-from data_loading import DataManager
+from data_loading import DataManager, MNISTDataset
 from img_plot import display_image
 from info import DEVICE
 
@@ -173,7 +173,7 @@ class GAN():
         total_samples = 0
         correct_on_real_images = 0
         correct_on_generated_images = 0
-        for batch, _ in dataloader:
+        for batch in dataloader:
             real_preds = self.discriminator(batch).squeeze(dim=1)
             correct_on_real_images += (real_preds > 0.5).sum()
 
@@ -216,7 +216,7 @@ class GAN():
             
             # Generator training loop--go through full dataset
             self.discriminator.train()
-            for training_images, _ in train_dataloader:
+            for training_images in train_dataloader:
                 # Discriminator training loop
                 self.discriminator.train()
                 for _ in range(discrim_sub_iterations):
@@ -255,9 +255,10 @@ class GAN():
             print()
 
 if __name__ == "__main__":
-    mnist_data = torchvision.datasets.MNIST('data/mnist', 
-                                        download=True,
-                                        transform=T.Compose([T.ToTensor(),torch.flatten]))
+    # mnist_data = torchvision.datasets.MNIST('data/mnist', 
+    #                                     download=True,
+    #                                     transform=T.Compose([T.ToTensor(),torch.flatten]))
+    mnist_data = MNISTDataset()
 
     train_size = int(.7 * len(mnist_data))
     val_size = int(.1 * len(mnist_data))
