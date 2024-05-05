@@ -44,9 +44,6 @@ class GAN():
         # We assume square images
         self.flattened_image_size = image_width * image_width
 
-        H1 = self.flattened_image_size // 4
-        H2 = 2 * self.flattened_image_size // 4
-        H3 = 3 * self.flattened_image_size // 4
         # Clamp the output of the generator, so it's a valid image
         self.generator = Sequential(
             NormalizedLinearWithResidual(49),
@@ -67,22 +64,19 @@ class GAN():
             NormalizedLinearWithResidual(784),
             Sigmoid()
         )
-        self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
+        self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
         self.generator.to(device=DEVICE)
 
         # Output of discriminator is prediction of whether or not it is real 
         # (note it still needs to be passed through sigmoid to be normalized)
         self.discriminator = Sequential(
-            BatchNorm1d(self.flattened_image_size),
-            Linear(self.flattened_image_size, H2),
+            NormalizedLinearWithResidual(784),
+            BatchNorm1d(784),
+            Linear(784, 392),
             ReLU(),
-            NormalizedLinearWithResidual(H2),
-            BatchNorm1d(H2),
-            Linear(H2, H1),
-            ReLU(),
-            NormalizedLinearWithResidual(H1),
-            BatchNorm1d(H1),
-            Linear(H1, 1)
+            NormalizedLinearWithResidual(392),
+            BatchNorm1d(392),
+            Linear(392, 1)
         )
         self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
         self.discriminator.to(device=DEVICE)
@@ -242,4 +236,4 @@ if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
     mnist_gan = GAN(noise_size=49, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
-    mnist_gan.train(mnist_data_manager.train(batch_size=32), num_epochs=1000)
+    mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=1000)
