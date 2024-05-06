@@ -78,6 +78,7 @@ class GAN():
             BatchNorm1d(392),
             Linear(392, 1)
         )
+        # self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
         self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
         self.discriminator.to(device=DEVICE)
 
@@ -236,4 +237,4 @@ if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
     mnist_gan = GAN(noise_size=49, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
-    mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=1000)
+    mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=100)
