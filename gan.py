@@ -46,6 +46,16 @@ class GAN():
 
         # Clamp the output of the generator, so it's a valid image
         self.generator = Sequential(
+            NormalizedLinearWithResidual(10),
+            NormalizedLinearWithResidual(10),
+            BatchNorm1d(10),
+            Linear(10, 25),
+            ReLU(),
+            NormalizedLinearWithResidual(25),
+            NormalizedLinearWithResidual(25),
+            BatchNorm1d(25),
+            Linear(25, 49),
+            ReLU(),
             NormalizedLinearWithResidual(49),
             BatchNorm1d(49),
             Linear(49, 98),
@@ -235,6 +245,6 @@ class GAN():
 
 if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
-    mnist_gan = GAN(noise_size=49, image_width=28, 
+    mnist_gan = GAN(noise_size=10, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
-    mnist_gan.train(mnist_data_manager.train(batch_size=32), num_epochs=100)
+    mnist_gan.train(mnist_data_manager.train(batch_size=32), num_epochs=1000)
