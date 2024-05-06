@@ -1,6 +1,6 @@
 import math
 import torch
-from torch.nn import Parameter, Sequential, BatchNorm1d, Linear, ReLU, Sigmoid, Tanh
+from torch.nn import Parameter, Sequential, BatchNorm1d, BatchNorm2d, Linear, ReLU, Sigmoid, Tanh, Conv2d, MaxPool2d, Flatten
 from data_loading import DataManager, MNISTDataset
 from img_plot import display_image
 from info import DEVICE
@@ -42,6 +42,7 @@ class GAN():
 
         self.noise_size = noise_size
         # We assume square images
+        self.image_width = image_width
         self.flattened_image_size = image_width * image_width
 
         # Clamp the output of the generator, so it's a valid image
@@ -80,13 +81,23 @@ class GAN():
         # Output of discriminator is prediction of whether or not it is real 
         # (note it still needs to be passed through sigmoid to be normalized)
         self.discriminator = Sequential(
-            NormalizedLinearWithResidual(784),
-            BatchNorm1d(784),
-            Linear(784, 392),
+            BatchNorm2d(1),
+            Conv2d(1, 8, kernel_size=7, padding=3),
             ReLU(),
-            NormalizedLinearWithResidual(392),
-            BatchNorm1d(392),
-            Linear(392, 1)
+            MaxPool2d(kernel_size=2, stride=2),
+
+            BatchNorm2d(8),
+            Conv2d(8, 16, kernel_size=5, padding=2),
+            ReLU(),
+            MaxPool2d(kernel_size=2, stride=2),
+
+            BatchNorm2d(16),
+            Conv2d(16, 32, kernel_size=3, padding=1),
+            ReLU(),
+            
+            BatchNorm2d(32),
+            Flatten(),
+            Linear(1568, 1)
         )
         # self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
         self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
@@ -110,7 +121,7 @@ class GAN():
         """
             Uses the generator to create batch_size number of images
         """
-        return self.generator(self.gen_noise(batch_size))
+        return self.generator(self.gen_noise(batch_size)).reshape(batch_size, 1, self.image_width, self.image_width)
     
     def mix_with_generated_images(self, real_images):
         # Presently the images are in two seperate groups–maybe shuffle them later?
@@ -198,7 +209,7 @@ class GAN():
         self.generator_optimizer.zero_grad()
         self.discriminator_optimizer.zero_grad()
         # Use generator to get minibatched input for discriminator
-        images = self.gen_images(batch_size).squeeze(dim = 1)
+        images = self.gen_images(batch_size)
 
         # Get predictions from model, calculate loss, and update parameters
         preds = self.discriminator(images).squeeze(dim = 1)
@@ -227,7 +238,7 @@ class GAN():
                 print("Validation Performance:")
                 self.evaluate(val_dataloader, print_stats=True)
 
-            display_image(self.gen_images().squeeze().clone().detach().to("cpu"), display=False, filename = f"testimgs/{epoch}.png")
+            display_image(self.gen_images().flatten().squeeze().clone().detach().to("cpu"), display=False, filename = f"testimgs/{epoch}.png")
             
             
             # Generator training loop--go through full dataset

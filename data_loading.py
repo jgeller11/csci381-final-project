@@ -9,9 +9,8 @@ class MNISTDataset(Dataset):
         mnist_data = torchvision.datasets.MNIST('data/mnist', 
                                         download=True)
         self.data = mnist_data.data.to(dtype=torch.float32, device=DEVICE) / 255
-        self.data = self.data.reshape((self.data.shape[0], -1))
+        self.data = self.data.unsqueeze(dim = 1)
         print(self.data.shape)
-        print(self.data)
     
     def __len__(self):
         return self.data.shape[0]
