@@ -2,13 +2,13 @@ import torch
 import matplotlib.pyplot as plt
 from math import sqrt
 
-def display_image(img_tensor, filename = None, display = True):
+def display_image(img_tensor, filename = None, display = True, scale = 1):
     side_length = sqrt(len(img_tensor))
     if int(side_length) - side_length == 0:
         side_length = int(side_length)
         square_img = img_tensor.float().reshape((side_length,side_length))
         scaled_image_tensor = torch.squeeze(torch.squeeze(
-            torch.nn.Upsample(scale_factor=30, mode='nearest')(
+            torch.nn.Upsample(scale_factor=scale, mode='nearest')(
             torch.unsqueeze(torch.unsqueeze(square_img, dim = 0), dim = 0)
             ), dim = 0), dim = 0)
         if filename is not None:
