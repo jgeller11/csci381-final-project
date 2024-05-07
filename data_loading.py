@@ -4,13 +4,26 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from info import DEVICE
+from torch.utils.data import Dataset
+from img_plot import display_image
 
 
 
 # data_loader = torch.utils.data.DataLoader(training_data,
 #                                           batch_size=4,
 #                                           shuffle=False)
-
+class MNISTDataset(Dataset):
+    def __init__(self):
+        mnist_data = torchvision.datasets.MNIST('data/mnist', 
+                                        download=True)
+        self.data = mnist_data.data.to(dtype=torch.float32, device=DEVICE) / 255
+        self.data = self.data.reshape((self.data.shape[0], -1))
+    
+    def __len__(self):
+        return self.data.shape[0]
+    
+    def __getitem__(self, idx):
+        return self.data[idx]
 
 
 # Code from uncool.py of kernels lab
@@ -56,9 +69,8 @@ class DataManager:
         - batch_size is the number of desired training examples per batch
         
         """
-        train_loader = DataLoader(self.train_set, batch_size=batch_size,
+        return DataLoader(self.train_set, batch_size=batch_size,
                                   sampler=RandomSampler(self.train_set))
-        return(train_loader)
     
     def val(self):
         """
