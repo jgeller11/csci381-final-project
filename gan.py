@@ -1,6 +1,6 @@
 import math
 import torch
-from torch.nn import Parameter, Sequential, BatchNorm1d, BatchNorm2d, Linear, ReLU, Sigmoid, Tanh, Conv2d, MaxPool2d, Flatten
+from torch.nn import Parameter, Sequential, BatchNorm1d, BatchNorm2d, Linear, ReLU, Sigmoid, Tanh, Conv2d, MaxPool2d, Flatten, Unflatten, ConvTranspose2d
 from data_loading import DataManager, MNISTDataset
 from img_plot import display_image
 from info import DEVICE
@@ -47,32 +47,22 @@ class GAN():
 
         # Clamp the output of the generator, so it's a valid image
         self.generator = Sequential(
-            NormalizedLinearWithResidual(10),
-            NormalizedLinearWithResidual(10),
-            BatchNorm1d(10),
-            Linear(10, 25),
+            BatchNorm1d(100),
+            Linear(100, 32 * 7 * 7),
+            Unflatten(1, (32, 7, 7)),
+            ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1),
             ReLU(),
-            NormalizedLinearWithResidual(25),
-            NormalizedLinearWithResidual(25),
-            BatchNorm1d(25),
-            Linear(25, 49),
+            ConvTranspose2d(32, 32, kernel_size=4, stride=2, padding=1),
             ReLU(),
-            NormalizedLinearWithResidual(49),
-            BatchNorm1d(49),
-            Linear(49, 98),
+            Conv2d(32, 32, kernel_size=3, padding=1),
             ReLU(),
-            NormalizedLinearWithResidual(98),
-            BatchNorm1d(98),
-            Linear(98, 196),
+            Conv2d(32, 16, kernel_size=3, padding=1),
             ReLU(),
-            NormalizedLinearWithResidual(196),
-            BatchNorm1d(196),
-            Linear(196, 392),
+            Conv2d(16, 8, kernel_size=3, padding=1),
             ReLU(),
-            NormalizedLinearWithResidual(392),
-            BatchNorm1d(392),
-            Linear(392, 784),
-            NormalizedLinearWithResidual(784),
+            Conv2d(8, 4, kernel_size=3, padding=1),
+            ReLU(),
+            Conv2d(4, 1, kernel_size=3, padding=1),
             Sigmoid()
         )
         self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
@@ -82,22 +72,26 @@ class GAN():
         # (note it still needs to be passed through sigmoid to be normalized)
         self.discriminator = Sequential(
             BatchNorm2d(1),
-            Conv2d(1, 8, kernel_size=7, padding=3),
+            Conv2d(1, 8, kernel_size=9, padding=4),
             ReLU(),
             MaxPool2d(kernel_size=2, stride=2),
 
-            BatchNorm2d(8),
-            Conv2d(8, 16, kernel_size=5, padding=2),
+            Conv2d(8, 16, kernel_size=7, padding=3),
             ReLU(),
             MaxPool2d(kernel_size=2, stride=2),
 
-            BatchNorm2d(16),
-            Conv2d(16, 32, kernel_size=3, padding=1),
+            Conv2d(16, 32, kernel_size=5, padding=2),
+            ReLU(),
+
+            Conv2d(32, 32, kernel_size=3, padding=1),
             ReLU(),
             
             BatchNorm2d(32),
             Flatten(),
-            Linear(1568, 1)
+            Linear(1568, 784),
+            NormalizedLinearWithResidual(784),
+            BatchNorm1d(784),
+            Linear(784, 1),
         )
         # self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
         self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
@@ -256,6 +250,6 @@ class GAN():
 
 if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
-    mnist_gan = GAN(noise_size=10, image_width=28, 
+    mnist_gan = GAN(noise_size=100, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
     mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=1000)
