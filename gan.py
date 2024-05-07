@@ -178,8 +178,8 @@ class GAN():
             raise Exception("discrim_sub_iterations > 1 not yet supported")
         
         for epoch in range(num_epochs):
-            torch.save(self.generator.state_dict(), f'models/generator.pth')
-            torch.save(self.discriminator.state_dict(), f'models/discriminator.pth')
+            torch.save(self.generator.state_dict(), f'models/g{epoch}.pth')
+            torch.save(self.discriminator.state_dict(), f'models/d{epoch}.pth')
 
             # Evaluate model (also on validation set, if provided)
             self.discriminator.eval()
@@ -209,6 +209,5 @@ class GAN():
 
 if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
-    mnist_gan = GAN(noise_size=49, image_width=28, 
-              discriminator_hidden_layers=6, discriminator_layer_size=100)
+    mnist_gan = GAN(noise_size=49, image_width=28)
     mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=1000)
