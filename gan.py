@@ -65,7 +65,7 @@ class GAN():
             NormalizedLinearWithResidual(784),
             Sigmoid()
         )
-        self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
+        self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0005, betas=(0.5, 0.9))
         self.generator.to(device=DEVICE)
 
         # Output of discriminator is prediction of whether or not it is real 
@@ -90,7 +90,7 @@ class GAN():
             Linear(1568, 1)
         )
         # self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
-        self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
+        self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0005, betas=(0.5, 0.9))
         self.discriminator.to(device=DEVICE)
 
     def discriminator_lossfn(self, logits, labels, real_image=False, epsilon=1e-5):
@@ -221,4 +221,4 @@ if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
     mnist_gan = GAN(noise_size=49, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
-    mnist_gan.train(mnist_data_manager.train(batch_size=32), num_epochs=1000)
+    mnist_gan.train(mnist_data_manager.train(batch_size=256), num_epochs=1000)
