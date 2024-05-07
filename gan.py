@@ -47,16 +47,6 @@ class GAN():
 
         # Clamp the output of the generator, so it's a valid image
         self.generator = Sequential(
-            NormalizedLinearWithResidual(10),
-            NormalizedLinearWithResidual(10),
-            BatchNorm1d(10),
-            Linear(10, 25),
-            ReLU(),
-            NormalizedLinearWithResidual(25),
-            NormalizedLinearWithResidual(25),
-            BatchNorm1d(25),
-            Linear(25, 49),
-            ReLU(),
             NormalizedLinearWithResidual(49),
             BatchNorm1d(49),
             Linear(49, 98),
@@ -105,11 +95,6 @@ class GAN():
 
     def discriminator_lossfn(self, logits, labels, real_image=False, epsilon=1e-5):
         return -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logits) - labels)))
-    
-        if real_image:
-            return -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logits) - 1)))
-        else:
-            return -torch.mean(torch.log(epsilon + 1 - torch.abs(torch.sigmoid(logits))))
         
     def generator_lossfn(self, logits, epsilon=1e-5):
         return -torch.mean(torch.log(epsilon + torch.sigmoid(logits)))
@@ -182,28 +167,6 @@ class GAN():
 
         # Debugging assert
         assert not math.isnan(loss)
-        
-
-        # # Get predictions from model, calculate loss, and update parameters
-        # self.discriminator_optimizer.zero_grad()
-        # generated_images = self.gen_images(len(real_images))
-        # generated_preds = self.discriminator(generated_images).squeeze(dim = 1)
-        # generated_labels = torch.zeros(len(generated_preds), device=DEVICE)
-        # generated_loss = self.discriminator_lossfn(generated_preds, generated_labels)
-        # print(f"Generated Loss: {generated_loss}")
-        # generated_loss.backward()
-        # # self.discriminator_optimizer.step()
-        # assert not math.isnan(generated_loss)
-        # # print(f"Discriminator Loss: {loss.item()}")
-
-        # # self.discriminator_optimizer.zero_grad()
-        # real_preds = self.discriminator(real_images).squeeze(dim = 1)
-        # real_labels = torch.ones(len(real_images), device=DEVICE)
-        # real_loss = self.discriminator_lossfn(real_preds, real_labels)
-        # print(f"Real Loss: {real_loss}")
-        # real_loss.backward()
-        # self.discriminator_optimizer.step()
-        # assert not math.isnan(real_loss)
     
     def generator_train_step(self, batch_size):
         self.generator_optimizer.zero_grad()
@@ -256,6 +219,6 @@ class GAN():
 
 if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
-    mnist_gan = GAN(noise_size=10, image_width=28, 
+    mnist_gan = GAN(noise_size=49, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
-    mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=1000)
+    mnist_gan.train(mnist_data_manager.train(batch_size=32), num_epochs=1000)
