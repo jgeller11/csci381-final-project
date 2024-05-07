@@ -65,32 +65,22 @@ class GAN():
             NormalizedLinearWithResidual(784),
             Sigmoid()
         )
-        self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0005, betas=(0.5, 0.9))
+        self.generator_optimizer = torch.optim.Adam(self.generator.parameters(), lr = 0.0001, betas=(0.5, 0.9))
         self.generator.to(device=DEVICE)
 
         # Output of discriminator is prediction of whether or not it is real 
         # (note it still needs to be passed through sigmoid to be normalized)
         self.discriminator = Sequential(
-            BatchNorm2d(1),
-            Conv2d(1, 8, kernel_size=7, padding=3),
+            NormalizedLinearWithResidual(784),
+            BatchNorm1d(784),
+            Linear(784, 392),
             ReLU(),
-            MaxPool2d(kernel_size=2, stride=2),
-
-            BatchNorm2d(8),
-            Conv2d(8, 16, kernel_size=5, padding=2),
-            ReLU(),
-            MaxPool2d(kernel_size=2, stride=2),
-
-            BatchNorm2d(16),
-            Conv2d(16, 32, kernel_size=3, padding=1),
-            ReLU(),
-            
-            BatchNorm2d(32),
-            Flatten(),
-            Linear(1568, 1)
+            NormalizedLinearWithResidual(392),
+            BatchNorm1d(392),
+            Linear(392, 1)
         )
         # self.discriminator = make_dense_network(self.flattened_image_size, 1, discriminator_hidden_layers, discriminator_layer_size)
-        self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0005, betas=(0.5, 0.9))
+        self.discriminator_optimizer = torch.optim.Adam(self.discriminator.parameters(), lr = 0.0002, betas=(0.5, 0.9))
         self.discriminator.to(device=DEVICE)
 
     def discriminator_lossfn(self, logits, labels, real_image=False, epsilon=1e-5):
@@ -106,7 +96,7 @@ class GAN():
         """
             Uses the generator to create batch_size number of images
         """
-        return self.generator(self.gen_noise(batch_size)).reshape(batch_size, 1, self.image_width, self.image_width)
+        return self.generator(self.gen_noise(batch_size))#.reshape(batch_size, 1, self.image_width, self.image_width)
     
     def mix_with_generated_images(self, real_images):
         # Presently the images are in two seperate groups–maybe shuffle them later?
@@ -221,4 +211,4 @@ if __name__ == "__main__":
     mnist_data_manager = DataManager(MNISTDataset())
     mnist_gan = GAN(noise_size=49, image_width=28, 
               discriminator_hidden_layers=6, discriminator_layer_size=100)
-    mnist_gan.train(mnist_data_manager.train(batch_size=256), num_epochs=1000)
+    mnist_gan.train(mnist_data_manager.train(batch_size=64), num_epochs=1000)
