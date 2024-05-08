@@ -92,11 +92,14 @@ class GAN():
     def gen_noise(self, batch_size = 1):
         return torch.randn(batch_size, self.noise_size, device=DEVICE)
     
-    def gen_images(self, batch_size=1):
+    def gen_images(self, batch_size=1, noise=None):
         """
             Uses the generator to create batch_size number of images
         """
-        return self.generator(self.gen_noise(batch_size))#.reshape(batch_size, 1, self.image_width, self.image_width)
+        if noise is not None:
+            return self.generator(noise)
+        else:
+            return self.generator(self.gen_noise(batch_size))#.reshape(batch_size, 1, self.image_width, self.image_width)
     
     def mix_with_generated_images(self, real_images):
         # Presently the images are in two seperate groups–maybe shuffle them later?
@@ -177,6 +180,8 @@ class GAN():
         if discrim_sub_iterations != 1:
             raise Exception("discrim_sub_iterations > 1 not yet supported")
         
+        tracked_noise = self.gen_noise(100)
+        
         for epoch in range(num_epochs):
             torch.save(self.generator.state_dict(), f'models/g{epoch}.pth')
             torch.save(self.discriminator.state_dict(), f'models/d{epoch}.pth')
@@ -191,7 +196,8 @@ class GAN():
                 print("Validation Performance:")
                 self.evaluate(val_dataloader, print_stats=True)
 
-            display_image(self.gen_images().flatten().squeeze().clone().detach().to("cpu"), display=False, filename = f"testimgs/{epoch}.png")
+            for i, noise in enumerate(tracked_noise):
+                display_image(self.gen_images(nosie = noise.unsqueeze(dim=0)).squeeze().clone().detach().to("cpu"), display=False, filename = f"testimgs/tracked_noise/{i}_{str(epoch).zfill(3)}.png")
             
             
             # Generator training loop--go through full dataset

@@ -3,3 +3,4 @@ __pycache__/*
 testimgs/*
 local_data/
 presentation/*
+.DS_Store
