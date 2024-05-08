@@ -10,7 +10,6 @@ class MNISTDataset(Dataset):
                                         download=True)
         self.data = mnist_data.data.to(dtype=torch.float32, device=DEVICE) / 255
         self.data = self.data.flatten(1)#self.data.unsqueeze(dim = 1)
-        print(self.data.shape)
     
     def __len__(self):
         return self.data.shape[0]

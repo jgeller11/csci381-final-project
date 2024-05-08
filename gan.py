@@ -5,6 +5,7 @@ from data_loading import DataManager, MNISTDataset
 from img_plot import display_image
 from info import DEVICE
 
+
 class NormalizedLinearWithResidual(torch.nn.Module):
     def __init__(self, layer_size):
         super().__init__()
@@ -35,10 +36,7 @@ def make_dense_network(input_size, output_size, num_hidden_layers=10, hidden_lay
     return layers
 
 class GAN():
-    def __init__(self, noise_size, image_width, 
-                 generator_hidden_layers=10, generator_layer_size=100,
-                 discriminator_hidden_layers=10, discriminator_layer_size=100):
-        print("NOTE: Generator Hidden Layers and Size currently unused!")
+    def __init__(self, noise_size, image_width):
 
         self.noise_size = noise_size
         # We assume square images
@@ -197,7 +195,7 @@ class GAN():
                 self.evaluate(val_dataloader, print_stats=True)
 
             for i, noise in enumerate(tracked_noise):
-                display_image(self.gen_images(nosie = noise.unsqueeze(dim=0)).squeeze().clone().detach().to("cpu"), display=False, filename = f"testimgs/tracked_noise/{i}_{str(epoch).zfill(3)}.png")
+                display_image(self.gen_images(noise = noise.unsqueeze(dim=0)).squeeze().clone().detach().to("cpu"), display=False, filename = f"testimgs/tracked_noise/{i}_{str(epoch).zfill(3)}.png")
             
             
             # Generator training loop--go through full dataset
